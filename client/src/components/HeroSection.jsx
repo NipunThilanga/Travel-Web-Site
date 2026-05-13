@@ -1,5 +1,6 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 const SLIDE_MS = 9000;
 
@@ -229,12 +230,12 @@ function HeroSection() {
             </div>
           </motion.div>
           <motion.div variants={itemVariants} className="mt-8 flex flex-wrap gap-4">
-            <a
-              href="#booking"
+            <Link
+              to="/booking"
               className="rounded-full bg-teal-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-teal-300"
             >
               Book Your Ride
-            </a>
+            </Link>
             <a
               href="#destinations"
               className="rounded-full border border-white/40 px-6 py-3 font-semibold text-white transition hover:bg-white/10"

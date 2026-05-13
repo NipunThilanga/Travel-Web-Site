@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Trash2, CarFront } from "lucide-react";
 
@@ -17,11 +17,34 @@ const initialState = {
   durationDays: 1
 };
 
-function BookingForm({ selectedVehicle, onRemoveVehicle }) {
+function sortLocations(list) {
+  return [...list].sort((a, b) => {
+    if (a.id === "pickup-cmb") return -1;
+    if (b.id === "pickup-cmb") return 1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
+function BookingForm({
+  selectedVehicle,
+  onRemoveVehicle,
+  locations = [],
+  originId = "pickup-cmb",
+  destinationId = "",
+  onOriginIdChange,
+  onDestinationIdChange,
+  computedDistanceKm = null,
+  routeLoading = false,
+  routeError = "",
+  routeMethod = ""
+}) {
   const [formData, setFormData] = useState(initialState);
   const [estimate, setEstimate] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+
+  const sortedLocations = useMemo(() => sortLocations(locations), [locations]);
+  const usePlacePickers = sortedLocations.length > 0 && onOriginIdChange && onDestinationIdChange;
 
   const canSubmit = useMemo(
     () =>
@@ -36,6 +59,39 @@ function BookingForm({ selectedVehicle, onRemoveVehicle }) {
       formData.travelEndDate,
     [formData, selectedVehicle]
   );
+
+  useEffect(() => {
+    if (!usePlacePickers) return;
+    const start = sortedLocations.find((l) => l.id === originId);
+    const end = sortedLocations.find((l) => l.id === destinationId);
+    setFormData((prev) => ({
+      ...prev,
+      pickupLocation: start?.label ?? "",
+      destination: end?.label ?? ""
+    }));
+  }, [usePlacePickers, sortedLocations, originId, destinationId]);
+
+  useEffect(() => {
+    if (computedDistanceKm == null || !Number.isFinite(Number(computedDistanceKm))) return;
+    const km = Number(computedDistanceKm);
+    setFormData((prev) => ({ ...prev, distanceKm: km }));
+  }, [computedDistanceKm]);
+
+  useEffect(() => {
+    async function run() {
+      if (!selectedVehicle) return;
+      const km = Number(formData.distanceKm) || 0;
+      const response = await axios.post("/api/calculate", {
+        vehicleId: selectedVehicle.id,
+        pricingModel: formData.pricingModel,
+        distanceKm: km,
+        durationDays: Number(formData.durationDays)
+      });
+      setEstimate(response.data.total);
+    }
+
+    run().catch(() => setEstimate(0));
+  }, [selectedVehicle, formData.pricingModel, formData.distanceKm, formData.durationDays]);
 
   const onChange = (event) => {
     const { name, value } = event.target;
@@ -127,14 +183,74 @@ function BookingForm({ selectedVehicle, onRemoveVehicle }) {
           </div>
         </div>
       )}
+
+      {usePlacePickers ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-slate-400">Pickup (from our locations)</span>
+            <select
+              value={originId}
+              onChange={(e) => onOriginIdChange(e.target.value)}
+              className="w-full rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm outline-none ring-emerald-400 transition focus:ring-2"
+            >
+              {sortedLocations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-slate-400">Destination</span>
+            <select
+              value={destinationId}
+              onChange={(e) => onDestinationIdChange(e.target.value)}
+              className="w-full rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm outline-none ring-emerald-400 transition focus:ring-2"
+            >
+              <option value="">Choose destination…</option>
+              {sortedLocations.map((loc) => (
+                <option key={loc.id} value={loc.id} disabled={loc.id === originId}>
+                  {loc.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {routeLoading && <p className="text-xs text-cyan-200/90 md:col-span-2">Calculating route distance…</p>}
+          {routeError && (
+            <p className="text-xs text-rose-300 md:col-span-2">{routeError}</p>
+          )}
+          {!routeLoading && computedDistanceKm != null && Number.isFinite(Number(computedDistanceKm)) && (
+            <p className="text-xs text-emerald-200/90 md:col-span-2">
+              Route distance: ~{Number(computedDistanceKm).toFixed(1)} km
+              {routeMethod === "google" ? " (Google driving)" : routeMethod === "estimate" ? " (estimated)" : ""}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            ["pickupLocation", "Pickup Location"],
+            ["destination", "Destination"]
+          ].map(([name, label]) => (
+            <input
+              key={name}
+              name={name}
+              required
+              value={formData[name]}
+              onChange={onChange}
+              placeholder={label}
+              className="rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm outline-none ring-emerald-400 transition focus:ring-2"
+            />
+          ))}
+        </div>
+      )}
+
       <div className="grid gap-3 md:grid-cols-2">
         {[
           ["customerName", "Name"],
           ["country", "Country"],
           ["email", "Email"],
-          ["whatsapp", "WhatsApp Number"],
-          ["pickupLocation", "Pickup Location"],
-          ["destination", "Destination"]
+          ["whatsapp", "WhatsApp Number"]
         ].map(([name, label]) => (
           <input
             key={name}
@@ -177,6 +293,7 @@ function BookingForm({ selectedVehicle, onRemoveVehicle }) {
           name="distanceKm"
           type="number"
           min="0"
+          step="0.1"
           value={formData.distanceKm}
           onChange={onChange}
           placeholder="Distance (km)"
@@ -206,9 +323,14 @@ function BookingForm({ selectedVehicle, onRemoveVehicle }) {
           disabled={!selectedVehicle}
           className="rounded-lg border border-emerald-400/60 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/10 disabled:opacity-50"
         >
-          Calculate Total
+          Recalculate total
         </button>
-        <p className="text-sm text-slate-200">Estimated Cost: ${estimate.toFixed(2)}</p>
+        <p className="text-sm text-slate-200">
+          Estimated total: ${estimate.toFixed(2)}{" "}
+          <span className="text-slate-500">
+            ({formData.pricingModel === "perKm" ? "per km rate" : "per day rate"})
+          </span>
+        </p>
       </div>
       <button
         type="submit"

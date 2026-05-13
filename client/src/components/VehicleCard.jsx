@@ -1,6 +1,20 @@
 import { motion } from "framer-motion";
 
-function VehicleCard({ vehicle, isSelected, onOpenGallery }) {
+function VehicleCard({ vehicle, isSelected, onOpenGallery, onSelect }) {
+  const handlePrimaryAction = () => {
+    if (isSelected) {
+      onOpenGallery?.();
+      return;
+    }
+
+    if (onSelect) {
+      onSelect(vehicle);
+      return;
+    }
+
+    onOpenGallery?.();
+  };
+
   return (
     <motion.article
       whileHover={{ y: -6 }}
@@ -32,7 +46,7 @@ function VehicleCard({ vehicle, isSelected, onOpenGallery }) {
         </div>
         <button
           type="button"
-          onClick={onOpenGallery}
+          onClick={handlePrimaryAction}
           className="w-full rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-slate-950 transition hover:bg-emerald-300"
         >
           {isSelected ? "Selected · View Gallery" : "Select Vehicle"}

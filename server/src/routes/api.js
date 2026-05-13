@@ -1,7 +1,9 @@
 import express from "express";
 import { vehicles } from "../data/vehicles.js";
 import { provinces } from "../data/provinces.js";
+import { serviceLocations } from "../data/serviceLocations.js";
 import { calculateTripCost } from "../utils/fareCalculator.js";
+import { estimateRouteKm } from "../utils/routeEstimate.js";
 import { buildBookingMessage, buildWhatsAppLink } from "../utils/whatsappMessage.js";
 import { Booking } from "../models/Booking.js";
 
@@ -13,6 +15,35 @@ router.get("/vehicles", (_, res) => {
 
 router.get("/provinces", (_, res) => {
   res.json(provinces);
+});
+
+router.get("/locations", (_, res) => {
+  const list = serviceLocations.map(({ id, label, provinceId, kind }) => ({
+    id,
+    label,
+    provinceId,
+    kind
+  }));
+  res.json(list);
+});
+
+router.post("/route-estimate", async (req, res) => {
+  const { originId, destinationId } = req.body ?? {};
+
+  if (!originId || !destinationId) {
+    return res.status(400).json({ message: "originId and destinationId are required." });
+  }
+
+  try {
+    const result = await estimateRouteKm(originId, destinationId);
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error("route-estimate:", error);
+    return res.status(500).json({ message: "Could not estimate route." });
+  }
 });
 
 router.post("/calculate", (req, res) => {
