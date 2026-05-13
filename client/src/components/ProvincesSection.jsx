@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import ProvincePlacesModal from "./ProvincePlacesModal";
 
@@ -50,7 +51,7 @@ function provinceSpecificFallback(name) {
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=640&height=420&nologo=true&model=flux`;
 }
 
-function ProvinceCardBody({ province, reduceMotion }) {
+export function ProvinceCardBody({ province, reduceMotion }) {
   const count = province.places?.length ?? 0;
   return (
     <>
@@ -118,63 +119,132 @@ function ProvinceCardBody({ province, reduceMotion }) {
   );
 }
 
-function ProvincesSection({ provinces }) {
+function ProvincesSection({ provinces, preview = false, previewCount = 6 }) {
   const [activeProvince, setActiveProvince] = useState(null);
   const reduceMotion = useReducedMotion();
-  const sets = chunkIntoSets(provinces, 3);
+
+  const displayProvinces = useMemo(() => {
+    if (!preview) return provinces;
+    const n = Math.max(1, Math.min(previewCount, provinces.length));
+    return provinces.slice(0, n);
+  }, [preview, previewCount, provinces]);
+
+  const sets = chunkIntoSets(displayProvinces, 3);
   const cv = reduceMotion ? cardVariantsReduced : cardVariants;
 
+  const sectionId = preview ? "destinations-preview" : "destinations";
+
   return (
-    <section id="destinations" className="band-destinations py-20">
+    <section id={sectionId} className="band-destinations py-20">
       <div className="band-inner mx-auto max-w-6xl px-4">
-        <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">Sri Lanka Showcase</p>
+        <p className="text-sm uppercase tracking-[0.25em] text-cyan-300">
+          {preview ? "Sample highlights" : "Sri Lanka Showcase"}
+        </p>
         <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">Destinations by province</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Tap any province card for a full gallery of curated places with imagery and long-form notes.
+          {preview
+            ? "A taste of our curated province galleries—tap a card to preview places. See every province on the full destinations page."
+            : "Tap any province card for a full gallery of curated places with imagery and long-form notes."}
         </p>
 
-        <div className="mt-12 flex flex-col gap-14 lg:gap-16">
-          {sets.map((row, rowIdx) => (
-            <div key={row.map((p) => p.id).join("-")} className="relative">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400/80">
-                  Set {rowIdx + 1}
-                </span>
-                <span className="h-px flex-1 bg-gradient-to-r from-cyan-500/35 to-transparent" />
-              </div>
-
-              <motion.div
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5"
-                initial="hidden"
-                whileInView="show"
-                viewport={{ once: true, margin: "-50px", amount: 0.15 }}
-                variants={reduceMotion ? { hidden: {}, show: { transition: { staggerChildren: 0.04 } } } : rowVariants}
-              >
-                {row.map((province) => (
-                  <motion.button
-                    key={province.id}
-                    type="button"
-                    variants={cv}
-                    whileHover={
-                      reduceMotion
-                        ? undefined
-                        : {
-                            y: -10,
-                            scale: 1.025,
-                            transition: { type: "spring", stiffness: 450, damping: 24 },
-                          }
-                    }
-                    whileTap={reduceMotion ? undefined : { scale: 0.985 }}
-                    onClick={() => setActiveProvince(province)}
-                    className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/70 text-left shadow-lg shadow-cyan-950/25 ring-1 ring-white/5 transition-shadow duration-300 hover:border-cyan-400/45 hover:shadow-cyan-500/25 hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
-                  >
-                    <ProvinceCardBody province={province} reduceMotion={reduceMotion} />
-                  </motion.button>
-                ))}
-              </motion.div>
+        {preview ? (
+          <div className="mt-12">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400/80">
+                Sample provinces
+              </span>
+              <span className="h-px flex-1 bg-gradient-to-r from-cyan-500/35 to-transparent" />
             </div>
-          ))}
-        </div>
+            <motion.div
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5"
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-50px", amount: 0.15 }}
+              variants={reduceMotion ? { hidden: {}, show: { transition: { staggerChildren: 0.04 } } } : rowVariants}
+            >
+              {displayProvinces.map((province) => (
+                <motion.button
+                  key={province.id}
+                  type="button"
+                  variants={cv}
+                  whileHover={
+                    reduceMotion
+                      ? undefined
+                      : {
+                          y: -10,
+                          scale: 1.025,
+                          transition: { type: "spring", stiffness: 450, damping: 24 },
+                        }
+                  }
+                  whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+                  onClick={() => setActiveProvince(province)}
+                  className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/70 text-left shadow-lg shadow-cyan-950/25 ring-1 ring-white/5 transition-shadow duration-300 hover:border-cyan-400/45 hover:shadow-cyan-500/25 hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
+                >
+                  <ProvinceCardBody province={province} reduceMotion={reduceMotion} />
+                </motion.button>
+              ))}
+            </motion.div>
+          </div>
+        ) : (
+          <div className="mt-12 flex flex-col gap-14 lg:gap-16">
+            {sets.map((row, rowIdx) => (
+              <div key={row.map((p) => p.id).join("-")} className="relative">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400/80">
+                    Set {rowIdx + 1}
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-cyan-500/35 to-transparent" />
+                </div>
+
+                <motion.div
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5"
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: "-50px", amount: 0.15 }}
+                  variants={
+                    reduceMotion ? { hidden: {}, show: { transition: { staggerChildren: 0.04 } } } : rowVariants
+                  }
+                >
+                  {row.map((province) => (
+                    <motion.button
+                      key={province.id}
+                      type="button"
+                      variants={cv}
+                      whileHover={
+                        reduceMotion
+                          ? undefined
+                          : {
+                              y: -10,
+                              scale: 1.025,
+                              transition: { type: "spring", stiffness: 450, damping: 24 },
+                            }
+                      }
+                      whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+                      onClick={() => setActiveProvince(province)}
+                      className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/70 text-left shadow-lg shadow-cyan-950/25 ring-1 ring-white/5 transition-shadow duration-300 hover:border-cyan-400/45 hover:shadow-cyan-500/25 hover:shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
+                    >
+                      <ProvinceCardBody province={province} reduceMotion={reduceMotion} />
+                    </motion.button>
+                  ))}
+                </motion.div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {preview && (
+          <div className="mt-12 flex flex-col items-center gap-3">
+            <Link
+              to="/destinations"
+              className="inline-flex w-full max-w-sm items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-teal-400 px-8 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-950/30 transition hover:from-cyan-300 hover:to-teal-300 sm:w-auto"
+            >
+              View all destinations
+            </Link>
+            <p className="max-w-md text-center text-xs text-slate-500">
+              Opens the complete province list and every curated place gallery.
+            </p>
+          </div>
+        )}
 
         <ProvincePlacesModal province={activeProvince} onClose={() => setActiveProvince(null)} />
       </div>

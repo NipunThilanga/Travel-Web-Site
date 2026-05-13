@@ -236,12 +236,12 @@ function HeroSection() {
             >
               Book Your Ride
             </Link>
-            <a
-              href="#destinations"
+            <Link
+              to="/destinations"
               className="rounded-full border border-white/40 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
             >
               Explore Sri Lanka
-            </a>
+            </Link>
           </motion.div>
         </motion.div>
       </div>

@@ -10,4 +10,10 @@ export default defineConfig({
       '/api': 'http://localhost:5000',
     },
   },
+  /** Same as dev: without this, `vite preview` calls `/api` on the preview port and routing breaks. */
+  preview: {
+    proxy: {
+      '/api': 'http://localhost:5000',
+    },
+  },
 })

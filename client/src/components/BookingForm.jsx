@@ -33,6 +33,8 @@ function BookingForm({
   destinationId = "",
   onOriginIdChange,
   onDestinationIdChange,
+  /** When provided, destination comes from province place picks (not the dropdown). */
+  tripDestinationSummary,
   computedDistanceKm = null,
   routeLoading = false,
   routeError = "",
@@ -44,7 +46,10 @@ function BookingForm({
   const [message, setMessage] = useState("");
 
   const sortedLocations = useMemo(() => sortLocations(locations), [locations]);
-  const usePlacePickers = sortedLocations.length > 0 && onOriginIdChange && onDestinationIdChange;
+  const provinceDestinationMode = typeof tripDestinationSummary === "string";
+  const usePickupSelect = sortedLocations.length > 0 && onOriginIdChange;
+  const useLegacyDestinationDropdown =
+    usePickupSelect && onDestinationIdChange && !provinceDestinationMode;
 
   const canSubmit = useMemo(
     () =>
@@ -61,15 +66,30 @@ function BookingForm({
   );
 
   useEffect(() => {
-    if (!usePlacePickers) return;
+    if (!usePickupSelect) return;
     const start = sortedLocations.find((l) => l.id === originId);
+    setFormData((prev) => ({
+      ...prev,
+      pickupLocation: start?.label ?? ""
+    }));
+  }, [usePickupSelect, sortedLocations, originId]);
+
+  useEffect(() => {
+    if (!provinceDestinationMode) return;
+    setFormData((prev) => ({
+      ...prev,
+      destination: tripDestinationSummary
+    }));
+  }, [provinceDestinationMode, tripDestinationSummary]);
+
+  useEffect(() => {
+    if (provinceDestinationMode || !useLegacyDestinationDropdown) return;
     const end = sortedLocations.find((l) => l.id === destinationId);
     setFormData((prev) => ({
       ...prev,
-      pickupLocation: start?.label ?? "",
       destination: end?.label ?? ""
     }));
-  }, [usePlacePickers, sortedLocations, originId, destinationId]);
+  }, [provinceDestinationMode, useLegacyDestinationDropdown, sortedLocations, destinationId]);
 
   useEffect(() => {
     if (computedDistanceKm == null || !Number.isFinite(Number(computedDistanceKm))) return;
@@ -184,10 +204,10 @@ function BookingForm({
         </div>
       )}
 
-      {usePlacePickers ? (
+      {usePickupSelect ? (
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-slate-400">Pickup (from our locations)</span>
+            <span className="text-xs font-medium text-slate-400">Pickup</span>
             <select
               value={originId}
               onChange={(e) => onOriginIdChange(e.target.value)}
@@ -200,25 +220,36 @@ function BookingForm({
               ))}
             </select>
           </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-slate-400">Destination</span>
-            <select
-              value={destinationId}
-              onChange={(e) => onDestinationIdChange(e.target.value)}
-              className="w-full rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm outline-none ring-emerald-400 transition focus:ring-2"
-            >
-              <option value="">Choose destination…</option>
-              {sortedLocations.map((loc) => (
-                <option key={loc.id} value={loc.id} disabled={loc.id === originId}>
-                  {loc.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {routeLoading && <p className="text-xs text-cyan-200/90 md:col-span-2">Calculating route distance…</p>}
-          {routeError && (
-            <p className="text-xs text-rose-300 md:col-span-2">{routeError}</p>
+          {provinceDestinationMode ? (
+            <div className="block space-y-1.5">
+              <span className="text-xs font-medium text-slate-400">Destinations (from place picks)</span>
+              <div className="min-h-[3rem] rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm leading-relaxed text-slate-200">
+                {tripDestinationSummary ? (
+                  tripDestinationSummary
+                ) : (
+                  <span className="text-slate-500">Select one or more places under “Destinations by province”.</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-slate-400">Destination</span>
+              <select
+                value={destinationId}
+                onChange={(e) => onDestinationIdChange(e.target.value)}
+                className="w-full rounded-lg border border-emerald-500/20 bg-slate-950/70 px-3 py-2.5 text-sm outline-none ring-emerald-400 transition focus:ring-2"
+              >
+                <option value="">Choose destination…</option>
+                {sortedLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id} disabled={loc.id === originId}>
+                    {loc.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
+          {routeLoading && <p className="text-xs text-cyan-200/90 md:col-span-2">Calculating route distance…</p>}
+          {routeError && <p className="text-xs text-rose-300 md:col-span-2">{routeError}</p>}
           {!routeLoading && computedDistanceKm != null && Number.isFinite(Number(computedDistanceKm)) && (
             <p className="text-xs text-emerald-200/90 md:col-span-2">
               Route distance: ~{Number(computedDistanceKm).toFixed(1)} km

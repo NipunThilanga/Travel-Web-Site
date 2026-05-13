@@ -3,7 +3,7 @@ import { vehicles } from "../data/vehicles.js";
 import { provinces } from "../data/provinces.js";
 import { serviceLocations } from "../data/serviceLocations.js";
 import { calculateTripCost } from "../utils/fareCalculator.js";
-import { estimateRouteKm } from "../utils/routeEstimate.js";
+import { estimateRouteKm, estimateMultiStopRoute } from "../utils/routeEstimate.js";
 import { buildBookingMessage, buildWhatsAppLink } from "../utils/whatsappMessage.js";
 import { Booking } from "../models/Booking.js";
 
@@ -28,18 +28,44 @@ router.get("/locations", (_, res) => {
 });
 
 router.post("/route-estimate", async (req, res) => {
-  const { originId, destinationId } = req.body ?? {};
+  const body = req.body ?? {};
+  const originId = body.originId ?? body.origin_id;
+  let stopPlaceKeys = body.stopPlaceKeys ?? body.stop_place_keys;
+  const destinationId = body.destinationId ?? body.destination_id;
 
-  if (!originId || !destinationId) {
-    return res.status(400).json({ message: "originId and destinationId are required." });
+  if (typeof stopPlaceKeys === "string") {
+    try {
+      stopPlaceKeys = JSON.parse(stopPlaceKeys);
+    } catch {
+      stopPlaceKeys = stopPlaceKeys ? [stopPlaceKeys] : [];
+    }
+  }
+
+  if (!originId || typeof originId !== "string") {
+    return res.status(400).json({ message: "originId is required (pickup location id)." });
   }
 
   try {
-    const result = await estimateRouteKm(originId, destinationId);
-    if (result.error) {
-      return res.status(400).json({ message: result.error });
+    if (Array.isArray(stopPlaceKeys) && stopPlaceKeys.length > 0) {
+      const result = await estimateMultiStopRoute(originId, stopPlaceKeys);
+      if (result.error) {
+        return res.status(400).json({ message: result.error });
+      }
+      return res.json(result);
     }
-    return res.json(result);
+
+    if (destinationId) {
+      const result = await estimateRouteKm(originId, destinationId);
+      if (result.error) {
+        return res.status(400).json({ message: result.error });
+      }
+      return res.json(result);
+    }
+
+    return res.status(400).json({
+      message:
+        "Send stopPlaceKeys: string[] (province place ids like \"central:temple-id\") from the booking picker, or destinationId for legacy hub-to-hub routes."
+    });
   } catch (error) {
     console.error("route-estimate:", error);
     return res.status(500).json({ message: "Could not estimate route." });

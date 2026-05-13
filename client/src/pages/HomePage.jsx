@@ -33,7 +33,7 @@ function HomePage({ vehicles, provinces, error }) {
           <div className="section-divider-teal" aria-hidden />
           <VehiclesSection vehicles={vehicles} />
           <div className="section-divider-cyan" aria-hidden />
-          <ProvincesSection provinces={provinces} />
+          <ProvincesSection provinces={provinces} preview previewCount={6} />
           <div className="section-divider-teal" aria-hidden />
         </>
       )}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link, useSearchParams } from "react-router-dom";
 import BookingForm from "../components/BookingForm";
+import BookingPlacesPicker from "../components/BookingPlacesPicker";
 import VehicleCard from "../components/VehicleCard";
 import VehicleGalleryModal from "../components/VehicleGalleryModal";
 import RouteMapPanel from "../components/RouteMapPanel";
@@ -9,7 +10,17 @@ import RouteMapPanel from "../components/RouteMapPanel";
 /** Only vehicles offered for booking (matches fleet). */
 const BOOKING_FLEET_IDS = ["suzuki-wagonr", "toyota-kdh-van"];
 
-function BookingPage({ vehicles }) {
+function placeLabelFromKey(key, provinces) {
+  const colon = key.indexOf(":");
+  if (colon === -1) return key;
+  const provinceId = key.slice(0, colon);
+  const placeId = key.slice(colon + 1);
+  const province = provinces.find((p) => p.id === provinceId);
+  const place = province?.places?.find((pl) => pl.id === placeId);
+  return place?.name ?? key;
+}
+
+function BookingPage({ vehicles, provinces = [] }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const preselectId = searchParams.get("vehicle") || "";
 
@@ -32,10 +43,15 @@ function BookingPage({ vehicles }) {
 
   const [locations, setLocations] = useState([]);
   const [originId, setOriginId] = useState("pickup-cmb");
-  const [destinationId, setDestinationId] = useState("");
+  const [stopPlaceKeys, setStopPlaceKeys] = useState([]);
   const [routeData, setRouteData] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState("");
+
+  const tripDestinationSummary = useMemo(
+    () => stopPlaceKeys.map((k) => placeLabelFromKey(k, provinces)).join(" → "),
+    [stopPlaceKeys, provinces]
+  );
 
   useEffect(() => {
     axios
@@ -53,13 +69,7 @@ function BookingPage({ vehicles }) {
   }, [preselectId, validPreselect, defaultId, bookingFleet]);
 
   useEffect(() => {
-    if (originId && destinationId && originId === destinationId) {
-      setDestinationId("");
-    }
-  }, [originId, destinationId]);
-
-  useEffect(() => {
-    if (!originId || !destinationId || originId === destinationId) {
+    if (!originId || stopPlaceKeys.length === 0) {
       setRouteData(null);
       setRouteError("");
       return;
@@ -70,7 +80,11 @@ function BookingPage({ vehicles }) {
     setRouteError("");
 
     axios
-      .post("/api/route-estimate", { originId, destinationId })
+      .post(
+        "/api/route-estimate",
+        { originId, stopPlaceKeys },
+        { headers: { "Content-Type": "application/json" } }
+      )
       .then((res) => {
         if (!cancelled) setRouteData(res.data);
       })
@@ -87,7 +101,7 @@ function BookingPage({ vehicles }) {
     return () => {
       cancelled = true;
     };
-  }, [originId, destinationId]);
+  }, [originId, stopPlaceKeys]);
 
   const selectedVehicle = useMemo(
     () => bookingFleet.find((v) => v.id === selectedVehicleId) ?? null,
@@ -111,15 +125,15 @@ function BookingPage({ vehicles }) {
             <p className="text-sm uppercase tracking-[0.25em] text-emerald-300">Booking</p>
             <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl">Reserve your ride</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Pick a vehicle, choose pickup and destination from our Sri Lanka locations, then review the estimated
-              distance and fare. The map updates beside the form.
+              Pick a vehicle, then choose one or more destination places (same galleries as the homepage). Distance and
+              fare update automatically; the map shows the full route beside your details.
             </p>
           </div>
           <Link
-            to="/#vehicles"
+            to="/"
             className="rounded-full border border-emerald-400/40 bg-slate-950/40 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:border-emerald-300/70 hover:bg-emerald-500/10"
           >
-            Back to vehicles
+            Back to home
           </Link>
         </div>
 
@@ -141,6 +155,10 @@ function BookingPage({ vehicles }) {
           </div>
         </section>
 
+        <div className="mt-12">
+          <BookingPlacesPicker provinces={provinces} stopPlaceKeys={stopPlaceKeys} onStopPlaceKeysChange={setStopPlaceKeys} />
+        </div>
+
         <div className="mt-12 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(300px,400px)] xl:items-start">
           <section className="min-w-0 space-y-6">
             <h2 className="text-lg font-semibold text-white">Trip details & contact</h2>
@@ -149,9 +167,8 @@ function BookingPage({ vehicles }) {
               onRemoveVehicle={() => setSelectedVehicleId("")}
               locations={locations}
               originId={originId}
-              destinationId={destinationId}
               onOriginIdChange={setOriginId}
-              onDestinationIdChange={setDestinationId}
+              tripDestinationSummary={tripDestinationSummary}
               computedDistanceKm={routeData?.distanceKm ?? null}
               routeLoading={routeLoading}
               routeError={routeError}

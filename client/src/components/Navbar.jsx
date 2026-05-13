@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 
 const links = [
-  { to: "/#vehicles", label: "Vehicles" },
+  { to: "/", label: "Home" },
   { to: "/booking", label: "Booking" },
-  { to: "/#destinations", label: "Destinations" },
+  { to: "/destinations", label: "Destinations" },
   { to: "/#contact", label: "Contact" }
 ];
 
@@ -19,7 +19,7 @@ function Navbar() {
         </Link>
         <ul className="hidden items-center gap-6 text-sm text-slate-200 md:flex">
           {links.map((item) => (
-            <li key={item.to}>
+            <li key={`${item.label}-${item.to}`}>
               <Link className="transition hover:text-teal-300" to={item.to}>
                 {item.label}
               </Link>

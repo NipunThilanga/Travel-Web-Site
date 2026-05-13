@@ -1,19 +1,46 @@
-const googleDirectionsUrl = (oLat, oLng, dLat, dLng) =>
-  `https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLng}&destination=${dLat},${dLng}&travelmode=driving`;
+function googleDirectionsMultiUrl(points) {
+  if (!points.length) return "https://www.google.com/maps";
+  return `https://www.google.com/maps/dir/${points.map((p) => `${p.lat},${p.lng}`).join("/")}`;
+}
 
-function osmEmbedSrc(origin, destination) {
-  const pad = 0.18;
-  const minLat = Math.min(origin.lat, destination.lat) - pad;
-  const maxLat = Math.max(origin.lat, destination.lat) + pad;
-  const minLng = Math.min(origin.lng, destination.lng) - pad;
-  const maxLng = Math.max(origin.lng, destination.lng) + pad;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${minLng}%2C${minLat}%2C${maxLng}%2C${maxLat}&layer=mapnik`;
+function osmEmbedBounds(points) {
+  if (!points.length) return "";
+  const pad = 0.28;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  for (const p of points) {
+    minLat = Math.min(minLat, p.lat);
+    maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng);
+    maxLng = Math.max(maxLng, p.lng);
+  }
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${minLng - pad}%2C${minLat - pad}%2C${maxLng + pad}%2C${maxLat + pad}&layer=mapnik`;
+}
+
+function embedDirectionsSrc(key, origin, destination, waypoints) {
+  let url = `https://www.google.com/maps/embed/v1/directions?key=${encodeURIComponent(
+    key
+  )}&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&mode=driving`;
+  if (waypoints?.length) {
+    const wp = waypoints.map((w) => `${w.lat},${w.lng}`).join("|");
+    url += `&waypoints=${encodeURIComponent(wp)}`;
+  }
+  return url;
 }
 
 function RouteMapPanel({ routeEstimate, loading, error }) {
   const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const origin = routeEstimate?.origin;
   const dest = routeEstimate?.destination;
+
+  const chainPoints = routeEstimate
+    ? [
+        { lat: routeEstimate.origin.lat, lng: routeEstimate.origin.lng },
+        ...(routeEstimate.stops ?? []).map((s) => ({ lat: s.lat, lng: s.lng })),
+      ]
+    : [];
 
   if (loading) {
     return (
@@ -34,12 +61,13 @@ function RouteMapPanel({ routeEstimate, loading, error }) {
   if (!origin || !dest) {
     return (
       <div className="flex h-[min(420px,55vh)] items-center justify-center rounded-2xl border border-slate-600/30 bg-slate-950/40 p-4 text-center text-sm text-slate-500">
-        Select pickup and destination to preview the route on the map.
+        Choose pickup and at least one destination place to preview the route on the map.
       </div>
     );
   }
 
-  const openGoogle = googleDirectionsUrl(origin.lat, origin.lng, dest.lat, dest.lng);
+  const openGoogle = googleDirectionsMultiUrl(chainPoints);
+  const waypoints = routeEstimate?.waypointsEmbed ?? [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -62,9 +90,7 @@ function RouteMapPanel({ routeEstimate, loading, error }) {
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
             allowFullScreen
-            src={`https://www.google.com/maps/embed/v1/directions?key=${encodeURIComponent(
-              mapsKey
-            )}&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}&mode=driving`}
+            src={embedDirectionsSrc(mapsKey, origin, dest, waypoints)}
           />
         ) : (
           <iframe
@@ -72,7 +98,7 @@ function RouteMapPanel({ routeEstimate, loading, error }) {
             className="h-[min(420px,55vh)] w-full"
             style={{ border: 0 }}
             loading="lazy"
-            src={osmEmbedSrc(origin, dest)}
+            src={osmEmbedBounds(chainPoints)}
           />
         )}
       </div>
@@ -88,8 +114,8 @@ function RouteMapPanel({ routeEstimate, loading, error }) {
         </a>
         {!mapsKey && (
           <p className="w-full text-[11px] text-slate-500">
-            Showing OpenStreetMap overview. Add VITE_GOOGLE_MAPS_API_KEY for embedded Google directions (same Cloud
-            project key must enable Maps Embed API).
+            Showing OpenStreetMap overview. Add VITE_GOOGLE_MAPS_API_KEY for embedded Google directions with waypoints
+            (enable Maps Embed API).
           </p>
         )}
       </div>
