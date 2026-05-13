@@ -1,6 +1,7 @@
 import HeroSection from "../components/HeroSection";
 import VehiclesSection from "../components/VehiclesSection";
 import ProvincesSection from "../components/ProvincesSection";
+import HomeAboutPreview from "../components/HomeAboutPreview";
 import ContactSection from "../components/ContactSection";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -33,6 +34,8 @@ function HomePage({ vehicles, provinces, error }) {
           <div className="section-divider-teal" aria-hidden />
           <VehiclesSection vehicles={vehicles} />
           <div className="section-divider-cyan" aria-hidden />
+          <HomeAboutPreview />
+          <div className="section-divider-teal" aria-hidden />
           <ProvincesSection provinces={provinces} preview previewCount={6} />
           <div className="section-divider-teal" aria-hidden />
         </>
